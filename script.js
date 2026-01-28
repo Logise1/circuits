@@ -264,6 +264,9 @@ class App {
         // Wire creation state
         this.wireDrag = null; // { comp, termIndex, currentMouseX, currentMouseY }
 
+        // Animation
+        this.wireDashOffset = 0;
+
         this.setupEvents();
         this.setupUI();
 
@@ -286,10 +289,14 @@ class App {
         // Switch
         const s = new Component('switch', -100, 0);
         s.rotation = 1;
+        const f = new Component('fan', 0, 100);
 
-        this.components.push(b, r, l, s);
-
-        // No wires initially, let user play
+        this.components.push(b, r, l, s, f);
+        // Connect them (optional, let user play)
+        this.wires.push(
+            { startComp: b, startTermId: 1, endComp: r, endTermId: 1 },
+            { startComp: r, startTermId: 0, endComp: b, endTermId: 0 }
+        );
     }
 
     resizeCanvas() {
@@ -310,6 +317,11 @@ class App {
             this.wires = [];
         });
 
+        // SAVE / LOAD
+        document.getElementById('save-btn').addEventListener('click', () => this.saveCircuit());
+        document.getElementById('load-trigger-btn').addEventListener('click', () => document.getElementById('file-input').click());
+        document.getElementById('file-input').addEventListener('change', (e) => this.loadCircuit(e));
+
         document.addEventListener('keydown', (e) => {
             if (e.key === 'Delete' && this.selectedComponent) {
                 this.components = this.components.filter(c => c !== this.selectedComponent);
@@ -322,6 +334,69 @@ class App {
                 this.selectedComponent.rotation = (this.selectedComponent.rotation + 1) % 4;
             }
         });
+    }
+
+    saveCircuit() {
+        // Serialize
+        const data = {
+            components: this.components.map(c => ({
+                id: c.id, type: c.type, x: c.x, y: c.y, rotation: c.rotation, properties: c.properties
+            })),
+            wires: this.wires.map(w => ({
+                startCompId: w.startComp.id,
+                startTermId: w.startTermId,
+                endCompId: w.endComp.id,
+                endTermId: w.endTermId
+            })),
+            camera: this.camera
+        };
+        const blob = new Blob([JSON.stringify(data)], { type: "application/json" });
+        const link = document.createElement("a");
+        link.href = URL.createObjectURL(blob);
+        link.download = "circuito.json";
+        link.click();
+    }
+
+    loadCircuit(e) {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+            try {
+                const data = JSON.parse(ev.target.result);
+                this.components = [];
+                this.wires = [];
+
+                // Rehydrate components
+                const compMap = new Map();
+                data.components.forEach(c => {
+                    const comp = new Component(c.type, c.x, c.y, c.id);
+                    comp.rotation = c.rotation;
+                    comp.properties = c.properties;
+                    compMap.set(c.id, comp);
+                    this.components.push(comp);
+                });
+
+                // Rehydrate wires
+                data.wires.forEach(w => {
+                    const start = compMap.get(w.startCompId);
+                    const end = compMap.get(w.endCompId);
+                    if (start && end) {
+                        this.wires.push({
+                            startComp: start, startTermId: w.startTermId,
+                            endComp: end, endTermId: w.endTermId
+                        });
+                    }
+                });
+
+                if (data.camera) this.camera = data.camera;
+
+            } catch (err) {
+                alert("Error cargando archivo: " + err);
+            }
+        };
+        reader.readAsText(file);
+        e.target.value = ''; // Reset
     }
 
     setupUI() {
@@ -482,7 +557,7 @@ class App {
 
     updatePropertiesPanel() {
         if (!this.selectedComponent) {
-            this.propertiesPanel.innerHTML = '<p class="placeholder-text">Selecciona un componente para editar sus propiedades.</p><p class="placeholder-text">Usa la tecla "Supr" para borrar.</p><p class="placeholder-text">Usa la tecla "R" para rotar.</p>';
+            this.propertiesPanel.innerHTML = '<p class="placeholder-text">Selecciona un componente.</p><p class="placeholder-text">Supr: Borrar | R: Rotar</p>';
             return;
         }
 
@@ -500,19 +575,20 @@ class App {
 
         if (c.type === 'battery') {
             html += createInput('Voltaje (V)', 'voltage', 0.1);
-            html += createInput('Resistencia Interna (Ω)', 'internalResistance', 0.1);
+            html += createInput('Res. Interna (Ω)', 'internalResistance', 0.1);
         } else if (c.type === 'resistor') {
             html += createInput('Resistencia (Ω)', 'resistance', 10);
-            html += createInput('Límite Potencia (W)', 'powerRating', 0.1);
-        } else if (c.type === 'light') {
+            html += createInput('Límite (W)', 'powerRating', 0.1);
+        } else if (c.type === 'light' || c.type === 'fan') {
             html += createInput('Resistencia (Ω)', 'resistance', 1);
-            html += `<div><strong>Luminosidad:</strong> ${Math.round(c.state.power * 100)}%</div>`;
+            html += `<div><strong>Potencia:</strong> ${(c.state.power).toFixed(3)} W</div>`;
+        } else if (c.type === 'diode') {
+            html += `<div><strong>Estado:</strong> ${c.state.voltageDrop > 0.5 ? 'Conduciendo' : 'Bloqueando'}</div>`;
         } else if (c.type === 'switch') {
             html += `
                 <div class="prop-row">
-                    <label>Estado</label>
                     <button class="glass-btn" style="width:100%" onclick="window.toggleSwitch('${c.id}')">
-                        ${c.properties.closed ? 'Cerrado (ON)' : 'Abierto (OFF)'}
+                        ${c.properties.closed ? 'Cerrado' : 'Abierto'}
                     </button>
                 </div>`;
         }
@@ -522,8 +598,7 @@ class App {
              <button class="glass-btn" style="background:#ef4444; margin-top:5px;" onclick="window.repairComp('${c.id}')">Reparar</button>`;
         } else {
             html += `<div style="margin-top:10px; font-size:0.8rem; color:#aaa;">
-                Corriente: ${(c.state.current * 1000).toFixed(1)} mA<br>
-                Potencia: ${(c.state.power).toFixed(3)} W
+                Corriente: ${(c.state.current * 1000).toFixed(1)} mA
              </div>`;
         }
 
@@ -613,11 +688,7 @@ class App {
         // Variables: N node voltages (excluding ground).
         // Plus M current variables for voltage sources (batteries).
 
-        const voltageSources = [];
-        this.components.forEach(c => {
-            if (c.type === 'battery' && !c.state.burnt) voltageSources.push(c);
-        });
-
+        const voltageSources = this.components.filter(c => c.type === 'battery' && !c.state.burnt);
         const numVars = matrixSize + voltageSources.length;
         const A = new Matrix(numVars, numVars);
         const b = Array(numVars).fill(0);
@@ -642,11 +713,17 @@ class App {
             const n1 = rootToMatrixIdx.get(find(keyToSetId.get(getTermKey(c, 0))));
             const n2 = rootToMatrixIdx.get(find(keyToSetId.get(getTermKey(c, 1))));
 
-            if (c.type === 'resistor' || c.type === 'light') {
+            if (c.type === 'resistor' || c.type === 'light' || c.type === 'fan') {
                 const R = parseFloat(c.properties.resistance); // Safe parsing
                 if (R > 0) addG(n1, n2, 1 / R);
             } else if (c.type === 'switch') {
                 const R = c.properties.closed ? 0.01 : 1e9; // 10mOhm or 1GOhm
+                addG(n1, n2, 1 / R);
+            } else if (c.type === 'diode') {
+                // Heuristic: If last frame VDrop > 0.7, conduct (low R), else block (high R)
+                // Default to blocked (High R) initially
+                let R = 1e7;
+                if (c.state.voltageDrop > c.properties.forwardVoltage) R = 0.1; // Conducting
                 addG(n1, n2, 1 / R);
             } else if (c.type === 'battery') {
                 // For a REAL battery with internal resistance:
@@ -680,11 +757,10 @@ class App {
                 // Real battery equation: V1 - V0 = V_emf - I_branch * R_int
                 // => V1 - V0 + R_int * I_branch = V_emf
 
-                if (n1 !== -1) A.data[n1][srcIdx] = -1; // Current leaves n1 (neg side) - Wait, if I is n1->n2
-                if (n2 !== -1) A.data[n2][srcIdx] = 1;  // Current enters n2 (pos side)
-
                 if (n1 !== -1) A.data[srcIdx][n1] = -1;
                 if (n2 !== -1) A.data[srcIdx][n2] = 1;
+                if (n1 !== -1) A.data[n1][srcIdx] = -1;
+                if (n2 !== -1) A.data[n2][srcIdx] = 1;
 
                 // V2 - V1 = E - I*RInt => V2 - V1 + I*RInt = E
                 // Current I flows - to + inside source (N1 to N2).
@@ -732,7 +808,7 @@ class App {
 
                 // Terminal Voltage
                 c.state.voltageDrop = v2 - v1;
-                c.state.current = Math.abs(iBatt); // Magnitude
+                c.state.current = iBatt; // Signed current
                 // Power dissipated in internal resistance? Or delivered?
                 // User wants to know if things burn. Battery power usually load.
                 // But internal heat = I^2 * rInt
@@ -743,14 +819,15 @@ class App {
                 const V = v2 - v1;
                 let R = parseFloat(c.properties.resistance);
                 if (c.type === 'switch') R = c.properties.closed ? 0.01 : 1e9;
+                if (c.type === 'diode') R = (c.state.voltageDrop > c.properties.forwardVoltage) ? 0.1 : 1e7;
 
                 const I = V / R;
-                c.state.current = I;
-                c.state.voltageDrop = Math.abs(V);
+                c.state.current = I; // Signed
+                c.state.voltageDrop = V;
                 c.state.power = I * I * R;
 
                 // Burn Logic
-                if (c.type === 'resistor' || c.type === 'light') {
+                if (['resistor', 'light', 'fan'].includes(c.type)) {
                     if (c.state.power > c.properties.powerRating * 1.5) { // 50% buffer before instant burn
                         c.state.burnt = true;
                         // Trigger visual refresh
@@ -758,6 +835,7 @@ class App {
                     }
                 }
             }
+            c.state.nodeIds = [n1, n2];
         });
     }
 
@@ -774,22 +852,80 @@ class App {
         this.ctx.scale(this.camera.zoom, this.camera.zoom);
         this.ctx.translate(-this.camera.x, -this.camera.y); // Move world opposite to camera
 
-        // Draw Wires
-        this.ctx.beginPath();
-        this.ctx.strokeStyle = '#64748b'; // Wire color
-        this.ctx.lineWidth = 3;
-        this.ctx.lineCap = 'round';
-        this.ctx.lineJoin = 'round';
+        this.wireDashOffset -= 1;
+
+        // Draw Wires with Loop
+        // Group wires by current flow if possible? No, independent draw is OK.
+        // We know startComp and endComp coordinates. 
+        // We also know connection nodes. 
+        // But what is the current in THIS wire?
+        // Wire connects node A and node B. Voltage A and B are known.
+        // The wire itself is ideal (0 ohm). So current is undefined locally unless we track branch currents.
+        // Our MNA only gives Component currents.
+        // But we want to visualize flow.
+        // Approximation: Flow is from higher Potential Node to lower Potential Node.
+        // We can just use the Potential Difference of the nodes it connects.
+        // Wait, if it's an ideal wire, Potential A = Potential B.
+        // So we can't determine direction just from V.
+        // We need branch currents. Complex in Node Analysis.
+        // SHORTCUT: Just trace current from Source components outward? Hard.
+        // ALTERNATIVE: Just animate "Active" wires. Wires connected to nodes with V > 0? No.
+        // Let's just animate based on the average voltage of the node relative to ground? 
+        // No, that doesn't show flow.
+
+        // BETTER SHORTCUT for Visuals: 
+        // Use component currents.
+        // If a wire is connected to a component carrying current I, animate that wire with speed I.
+        // A wire segment connects C1.T1 to C2.T2.
+        // If C1 is a resistor with current I entering T1, then wire has current I leaving T1.
+        // We can look at the component connected to the wire.
 
         for (let w of this.wires) {
             const startT = w.startComp.getAbsoluteTerminals().find(t => t.id === w.startTermId);
             const endT = w.endComp.getAbsoluteTerminals().find(t => t.id === w.endTermId);
             if (startT && endT) {
+                this.ctx.beginPath();
                 this.ctx.moveTo(startT.x, startT.y);
                 this.ctx.lineTo(endT.x, endT.y);
+                this.ctx.strokeStyle = '#64748b';
+                this.ctx.lineWidth = 3;
+                this.ctx.setLineDash([]);
+                this.ctx.stroke();
+
+                // Current Flow Overlay
+                // Determine current in this wire segment.
+                // It's equal to the current flowing out of StartComp's terminal.
+                // StartComp.state.current is magnitude? No effectively I through it.
+                // We need to know direction relative to terminal.
+                // Terminal 0 vs 1.
+                // If current > 0, flow is 1->0 (conventional? No usually + to -).
+                // In our model: I = (V_1 - V_0)/R. So if V1>V0, I>0. Flows 1->0 inside component?
+                // R is passive. Current flows V_high -> V_low.
+                // So if V1 > V0, current flows 1 -> 0 THROUGH component.
+                // So at Terminal 1, current ENTERS component from wire.
+                // So Wire current flows INTO T1.
+                // So Wire direction (Target -> T1).
+
+                // Let's simply take the max current of the two components it connects to as visual proxy.
+                const i1 = Math.abs(w.startComp.state.current);
+                const i2 = Math.abs(w.endComp.state.current);
+                const flow = Math.max(i1, i2);
+
+                if (flow > 0.001) {
+                    this.ctx.beginPath();
+                    this.ctx.moveTo(startT.x, startT.y);
+                    this.ctx.lineTo(endT.x, endT.y);
+                    this.ctx.strokeStyle = '#facc15'; // Current color
+                    this.ctx.lineWidth = 2;
+                    this.ctx.setLineDash([5, 5]);
+                    // Speed prop to current
+                    const speed = flow * 200;
+                    this.ctx.lineDashOffset = -Date.now() / 1000 * speed;
+                    this.ctx.stroke();
+                    this.ctx.setLineDash([]);
+                }
             }
         }
-        this.ctx.stroke();
 
         // Draw Active Wire
         if (this.wireDrag) {
@@ -811,9 +947,7 @@ class App {
             const terms = c.getAbsoluteTerminals();
             this.ctx.fillStyle = '#fff';
             for (let t of terms) {
-                this.ctx.beginPath();
-                this.ctx.arc(t.x, t.y, 3, 0, Math.PI * 2);
-                this.ctx.fill();
+                this.ctx.beginPath(); ctx.arc(t.x, t.y, 3, 0, Math.PI * 2); ctx.fill();
             }
 
             if (c === this.selectedComponent) {
@@ -833,12 +967,6 @@ class App {
         }
 
         this.ctx.restore();
-
-        if (this.selectedComponent && !this.selectedComponent.state.burnt) {
-            // Occasionally refresh props panel values if needed
-            // But DOM updates are expensive, better to update only on change or slow interval
-            // For now, let's just update values if panel is distinct
-        }
 
         requestAnimationFrame(() => this.loop());
     }
