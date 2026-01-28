@@ -947,7 +947,7 @@ class App {
             const terms = c.getAbsoluteTerminals();
             this.ctx.fillStyle = '#fff';
             for (let t of terms) {
-                this.ctx.beginPath(); ctx.arc(t.x, t.y, 3, 0, Math.PI * 2); ctx.fill();
+                this.ctx.beginPath(); this.ctx.arc(t.x, t.y, 3, 0, Math.PI * 2); this.ctx.fill();
             }
 
             if (c === this.selectedComponent) {
@@ -967,6 +967,18 @@ class App {
         }
 
         this.ctx.restore();
+
+        if (this.selectedComponent && !this.selectedComponent.state.burnt) {
+            // Update dynamic values in panel every frame or so to show results
+            // We can just re-render the variable parts, but calling updatePropertiesPanel is easier
+            // To avoid performance hit, maybe check if values changed significantly?
+            // For simplicity, let's just call it if frameCount % 10 === 0
+            if (!this.frameCount) this.frameCount = 0;
+            this.frameCount++;
+            if (this.frameCount % 5 === 0) {
+                this.updatePropertiesPanel();
+            }
+        }
 
         requestAnimationFrame(() => this.loop());
     }
