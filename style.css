@@ -1,25 +1,30 @@
 :root {
-    --bg-color: #0f172a;
+    --bg-color: #020617;
+    /* Slate 950 - Darker, richer */
     --grid-color: #1e293b;
     --primary-color: #3b82f6;
+    /* Blue 500 */
     --accent-color: #f59e0b;
-    --danger-color: #ef4444;
-    --text-primary: #f8fafc;
+    --text-primary: #f1f5f9;
     --text-secondary: #94a3b8;
-    --glass-bg: rgba(30, 41, 59, 0.7);
-    --glass-border: rgba(255, 255, 255, 0.1);
-    --glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+    --glass-bg: rgba(15, 23, 42, 0.6);
+    /* More transparent */
+    --glass-border: rgba(255, 255, 255, 0.08);
+    --glass-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    --bubble-bg: rgba(30, 41, 59, 0.85);
+    /* Slightly clearer for readabilty */
 }
 
 * {
     box-sizing: border-box;
     user-select: none;
+    outline: none;
 }
 
 body {
     margin: 0;
     padding: 0;
-    font-family: 'Inter', sans-serif;
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
     background-color: var(--bg-color);
     color: var(--text-primary);
     overflow: hidden;
@@ -37,8 +42,10 @@ canvas {
     display: block;
     width: 100%;
     height: 100%;
-    background-image: radial-gradient(var(--grid-color) 1px, transparent 1px);
-    background-size: 20px 20px;
+    background-image:
+        linear-gradient(var(--grid-color) 1px, transparent 1px),
+        linear-gradient(90deg, var(--grid-color) 1px, transparent 1px);
+    background-size: 40px 40px;
     cursor: grab;
 }
 
@@ -48,16 +55,12 @@ canvas:active {
 
 #ui-layer {
     position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
+    inset: 0;
     pointer-events: none;
-    /* Let clicks pass through to canvas where empty */
 }
 
-/* Glassmorphism Classes */
-.glass-panel {
+/* Glass Utility */
+.glass {
     background: var(--glass-bg);
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
@@ -67,233 +70,235 @@ canvas:active {
     pointer-events: auto;
 }
 
-/* Sidebar */
-.sidebar {
+/* Sidebar - Now a floating toolbar */
+.toolbar {
     position: absolute;
-    left: 20px;
-    top: 20px;
-    bottom: 20px;
-    width: 280px;
-    padding: 20px;
-    display: flex;
-    flex-direction: column;
-    gap: 20px;
-    transition: transform 0.3s ease;
-}
-
-.header h2 {
-    margin: 0;
-    font-weight: 600;
-    font-size: 1.2rem;
-    color: var(--primary-color);
-}
-
-.component-list {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 12px;
-}
-
-.component-item {
-    background: rgba(255, 255, 255, 0.05);
-    border: 1px solid rgba(255, 255, 255, 0.05);
-    border-radius: 12px;
-    padding: 15px;
+    left: 24px;
+    top: 24px;
+    bottom: 24px;
+    width: 80px;
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 10px;
+    padding: 20px 10px;
+    gap: 24px;
+    z-index: 10;
+    transition: width 0.3s ease;
+}
+
+.toolbar:hover {
+    width: 220px;
+}
+
+.brand {
+    font-weight: 700;
+    color: var(--primary-color);
+    font-size: 1.2rem;
+    margin-bottom: 20px;
+    text-align: center;
+    white-space: nowrap;
+    overflow: hidden;
+}
+
+.toolbar:hover .brand::after {
+    content: "Sim";
+    color: white;
+}
+
+.brand::before {
+    content: "⚡";
+    display: block;
+    font-size: 1.5rem;
+    margin-bottom: 5px;
+}
+
+/* Components List */
+.component-list {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    width: 100%;
+    overflow-y: auto;
+    overflow-x: hidden;
+    flex: 1;
+}
+
+.component-item {
+    display: flex;
+    align-items: center;
+    padding: 10px;
+    border-radius: 12px;
+    transition: all 0.2s;
     cursor: grab;
-    transition: all 0.2sease;
+    width: 100%;
 }
 
 .component-item:hover {
     background: rgba(255, 255, 255, 0.1);
-    transform: translateY(-2px);
-    border-color: var(--primary-color);
 }
 
-.component-item span {
-    font-size: 0.8rem;
-    color: var(--text-secondary);
+.toolbar:not(:hover) .component-item span {
+    display: none;
 }
 
-/* Icons (CSS based for simplicity, could be SVGs) */
-.icon {
+.component-item .icon {
     width: 40px;
     height: 40px;
-    position: relative;
+    min-width: 40px;
     border-radius: 8px;
-    overflow: hidden;
-}
-
-.battery-icon {
-    background: linear-gradient(90deg, #444 40%, transparent 40%, transparent 60%, #444 60%);
-    border: 2px solid #ccc;
-}
-
-.battery-icon::after {
-    content: '+';
-    position: absolute;
-    right: -5px;
-    top: 50%;
-    transform: translateY(-50%);
-    font-size: 10px;
-}
-
-.resistor-icon {
-    background: #eab308;
-    height: 10px;
-    margin-top: 15px;
-    border-radius: 4px;
-}
-
-.light-icon {
-    background: #fef08a;
-    border-radius: 50%;
-    box-shadow: 0 0 10px #fef08a;
-}
-
-.switch-icon {
-    border-bottom: 2px solid #ccc;
-    height: 20px;
-}
-
-.switch-icon::after {
-    content: '';
-    position: absolute;
-    width: 100%;
-    height: 2px;
-    background: #ccc;
-    transform: rotate(-30deg);
-    transform-origin: 0% 100%;
-    bottom: 0px;
-}
-
-.fan-icon {
-    border: 2px solid #ccc;
-    border-radius: 50%;
-    background: conic-gradient(from 0deg, #444 0deg 90deg, transparent 90deg 180deg, #444 180deg 270deg, transparent 270deg 360deg);
-}
-
-.diode-icon {
+    background: rgba(255, 255, 255, 0.05);
     display: flex;
     align-items: center;
     justify-content: center;
 }
 
-.diode-icon::before {
-    content: '▶|';
-    color: #ccc;
-    font-weight: bold;
-    font-size: 1.2rem;
+.component-item span {
+    margin-left: 12px;
+    font-size: 0.95rem;
+    font-weight: 500;
+    white-space: nowrap;
+    opacity: 0;
+    animation: fadeIn 0.2s 0.1s forwards;
 }
 
-/* File Controls */
-.file-controls h3 {
-    margin-top: 0;
-    font-size: 1rem;
-    color: var(--text-primary);
+@keyframes fadeIn {
+    to {
+        opacity: 1;
+    }
 }
 
-.btn-group {
+/* File Controls at Bottom */
+.file-controls {
+    width: 100%;
     display: flex;
+    flex-direction: column;
     gap: 10px;
 }
 
-.small-btn {
-    padding: 6px 12px;
-    font-size: 0.8rem;
-    flex: 1;
+.toolbar:not(:hover) .file-controls {
+    display: none;
 }
 
-/* Properties Panel */
-.separator {
-    height: 1px;
-    background: rgba(255, 255, 255, 0.1);
-    width: 100%;
+/* Properties Bubble - Floating Right */
+.properties-bubble {
+    position: absolute;
+    top: 24px;
+    right: 24px;
+    width: 300px;
+    background: var(--bubble-bg);
+    border: 1px solid var(--glass-border);
+    backdrop-filter: blur(16px);
+    border-radius: 20px;
+    padding: 24px;
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
+    pointer-events: auto;
+    transform: translateX(120%);
+    /* Hidden by default */
+    transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
 }
 
-.properties-panel {
-    flex-grow: 1;
+.properties-bubble.visible {
+    transform: translateX(0);
 }
 
-.properties-panel h3 {
-    margin-top: 0;
-    font-size: 1rem;
-    color: var(--text-primary);
+.properties-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    padding-bottom: 15px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
 }
 
-.placeholder-text {
+.properties-header h3 {
+    margin: 0;
+    font-size: 1.1rem;
+    font-weight: 600;
+}
+
+.prop-close-btn {
+    background: none;
+    border: none;
     color: var(--text-secondary);
-    font-style: italic;
-    font-size: 0.9rem;
+    cursor: pointer;
+    font-size: 1.2rem;
 }
 
+/* Inputs Modern */
 .prop-row {
-    margin-bottom: 12px;
+    margin-bottom: 16px;
 }
 
 .prop-row label {
     display: block;
-    font-size: 0.8rem;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
     color: var(--text-secondary);
-    margin-bottom: 4px;
+    margin-bottom: 6px;
 }
 
 .prop-row input {
     width: 100%;
-    background: rgba(0, 0, 0, 0.3);
+    background: rgba(0, 0, 0, 0.2);
     border: 1px solid rgba(255, 255, 255, 0.1);
     color: white;
-    padding: 8px;
-    border-radius: 6px;
+    padding: 10px 12px;
+    border-radius: 8px;
     font-family: inherit;
+    font-size: 0.9rem;
+    transition: all 0.2s;
 }
 
 .prop-row input:focus {
-    outline: none;
     border-color: var(--primary-color);
+    background: rgba(0, 0, 0, 0.4);
+}
+
+/* Live Stats Section */
+.live-stats {
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: 12px;
+    padding: 16px;
+    margin-top: 20px;
+}
+
+.stat-item {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 8px;
+    font-size: 0.9rem;
+}
+
+.stat-item:last-child {
+    margin-bottom: 0;
+}
+
+.stat-label {
+    color: var(--text-secondary);
+}
+
+.stat-value {
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    color: var(--accent-color);
 }
 
 /* Status Bar */
 .status-bar {
     position: absolute;
-    top: 20px;
-    right: 20px;
-    padding: 10px 20px;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%);
+    padding: 8px 16px;
     display: flex;
-    gap: 20px;
+    gap: 24px;
     align-items: center;
+    border-radius: 100px;
+    /* Pill shape */
 }
 
-.status-item {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    font-size: 0.9rem;
-}
-
-.status-indicator {
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    background-color: #ef4444;
-}
-
-.status-indicator.active {
-    background-color: #22c55e;
-    box-shadow: 0 0 10px #22c55e;
-}
-
-/* Overlay Controls */
-.overlay-controls {
-    position: absolute;
-    bottom: 20px;
-    right: 20px;
-    pointer-events: auto;
-}
-
+/* Buttons */
 .glass-btn {
     background: var(--primary-color);
     border: none;
@@ -302,18 +307,83 @@ canvas:active {
     border-radius: 8px;
     cursor: pointer;
     font-weight: 500;
-    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    font-size: 0.9rem;
     transition: all 0.2s;
+    text-align: center;
 }
 
 .glass-btn:hover {
-    background: #2563eb;
+    filter: brightness(1.1);
     transform: translateY(-1px);
-    box-shadow: 0 6px 8px -1px rgba(0, 0, 0, 0.2);
 }
 
-.burnt-effect {
+.glass-btn.danger {
+    background: #ef4444;
+}
+
+/* Icons styling fixes */
+.icon {
+    position: relative;
+    overflow: hidden;
+}
+
+.battery-icon {
+    background: linear-gradient(90deg, #64748b 40%, transparent 40%, transparent 60%, #64748b 60%);
+    border: 2px solid #94a3b8;
+}
+
+.battery-icon::after {
+    content: '+';
     position: absolute;
-    pointer-events: none;
-    mix-blend-mode: multiply;
+    right: 4px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 14px;
+    color: #fff;
+}
+
+.resistor-icon {
+    background: #eab308;
+    height: 10px;
+    width: 30px;
+    border-radius: 4px;
+}
+
+.light-icon {
+    background: #fef08a;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+}
+
+.switch-icon {
+    border-bottom: 2px solid #ccc;
+    width: 24px;
+    height: 20px;
+}
+
+.switch-icon::after {
+    content: '';
+    position: absolute;
+    width: 24px;
+    height: 2px;
+    background: #ccc;
+    transform: rotate(-30deg);
+    transform-origin: 0% 100%;
+    bottom: 0;
+}
+
+.fan-icon {
+    border: 2px solid #ccc;
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    background: conic-gradient(from 0deg, #444 0deg 90deg, transparent 90deg 180deg, #444 180deg 270deg, transparent 270deg 360deg);
+}
+
+.diode-icon::before {
+    content: '▶|';
+    color: #ccc;
+    font-weight: bold;
+    font-size: 1.2rem;
 }

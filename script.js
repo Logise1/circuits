@@ -141,8 +141,10 @@ class Component {
         else if (this.type === 'diode') this.drawDiode(ctx);
 
         if (this.state.burnt) {
-            ctx.fillStyle = "rgba(0,0,0,0.5)";
-            ctx.fillText("❌", -6, 4);
+            ctx.font = "24px Arial";
+            ctx.textAlign = "center";
+            ctx.textBaseline = "middle";
+            ctx.fillText("🔥", 0, 0);
         }
 
         ctx.restore();
@@ -550,59 +552,82 @@ class App {
         const zoomSpeed = 0.1;
         const delta = -Math.sign(e.deltaY) * zoomSpeed;
         const newZoom = Math.max(0.1, Math.min(5, this.camera.zoom + delta));
-
         this.camera.zoom = newZoom;
         this.zoomLevelEl.innerText = Math.round(newZoom * 100) + '%';
     }
 
-    updatePropertiesPanel() {
+    updatePropertiesPanel(onlyStats = false) {
+        const panelEl = document.getElementById('properties-panel');
         if (!this.selectedComponent) {
-            this.propertiesPanel.innerHTML = '<p class="placeholder-text">Selecciona un componente.</p><p class="placeholder-text">Supr: Borrar | R: Rotar</p>';
+            panelEl.classList.remove('visible');
             return;
         }
 
+        panelEl.classList.add('visible');
         const c = this.selectedComponent;
-        let html = `<div><strong>Tipo:</strong> ${c.type.toUpperCase()}</div>`;
 
-        const createInput = (label, key, step = 1) => {
-            return `
-                <div class="prop-row">
-                    <label>${label}</label>
-                    <input type="number" step="${step}" value="${c.properties[key]}" 
-                    onchange="window.updateCompProp('${c.id}', '${key}', this.value)">
-                </div>`;
-        };
+        if (!onlyStats) {
+            // Render Structure & Inputs
+            document.getElementById('prop-title').innerText = c.type.toUpperCase();
+            let html = '';
 
-        if (c.type === 'battery') {
-            html += createInput('Voltaje (V)', 'voltage', 0.1);
-            html += createInput('Res. Interna (Ω)', 'internalResistance', 0.1);
-        } else if (c.type === 'resistor') {
-            html += createInput('Resistencia (Ω)', 'resistance', 10);
-            html += createInput('Límite (W)', 'powerRating', 0.1);
-        } else if (c.type === 'light' || c.type === 'fan') {
-            html += createInput('Resistencia (Ω)', 'resistance', 1);
-            html += `<div><strong>Potencia:</strong> ${(c.state.power).toFixed(3)} W</div>`;
-        } else if (c.type === 'diode') {
-            html += `<div><strong>Estado:</strong> ${c.state.voltageDrop > 0.5 ? 'Conduciendo' : 'Bloqueando'}</div>`;
-        } else if (c.type === 'switch') {
-            html += `
-                <div class="prop-row">
-                    <button class="glass-btn" style="width:100%" onclick="window.toggleSwitch('${c.id}')">
-                        ${c.properties.closed ? 'Cerrado' : 'Abierto'}
-                    </button>
-                </div>`;
+            const createInput = (label, key, step = 1) => `
+                 <div class="prop-row">
+                     <label>${label}</label>
+                     <input type="number" step="${step}" value="${c.properties[key]}" 
+                     onchange="window.updateCompProp('${c.id}', '${key}', this.value)">
+                 </div>`;
+
+            if (c.type === 'battery') {
+                html += createInput('Voltaje (V)', 'voltage', 0.1);
+                html += createInput('Res. Interna (Ω)', 'internalResistance', 0.1);
+            } else if (c.type === 'resistor') {
+                html += createInput('Resistencia (Ω)', 'resistance', 10);
+                html += createInput('Límite (W)', 'powerRating', 0.1);
+            } else if (c.type === 'light' || c.type === 'fan') {
+                html += createInput('Resistencia (Ω)', 'resistance', 1);
+            } else if (c.type === 'switch') {
+                html += `
+                 <div class="prop-row">
+                     <button class="glass-btn" style="width:100%" onclick="window.toggleSwitch('${c.id}')">
+                         ${c.properties.closed ? 'Cerrado' : 'Abierto'}
+                     </button>
+                 </div>`;
+            }
+
+            // Placeholder for stats
+            html += `<div id="live-stats-container" class="live-stats"></div>`;
+
+            if (c.state.burnt) {
+                html += `<div style="color: #ef4444; font-weight: bold; margin-top: 10px; text-align:center">¡QUEMADO!</div>
+                 <button class="glass-btn danger" style="width:100%; margin-top:5px;" onclick="window.repairComp('${c.id}')">Reparar</button>`;
+            }
+
+            this.propertiesPanel.innerHTML = html;
         }
 
-        if (c.state.burnt) {
-            html += `<div style="color: #ef4444; font-weight: bold; margin-top: 10px;">¡QUEMADO!</div>
-             <button class="glass-btn" style="background:#ef4444; margin-top:5px;" onclick="window.repairComp('${c.id}')">Reparar</button>`;
-        } else {
-            html += `<div style="margin-top:10px; font-size:0.8rem; color:#aaa;">
-                Corriente: ${(c.state.current * 1000).toFixed(1)} mA
-             </div>`;
-        }
+        // Update Stats ONLY
+        const statsEl = document.getElementById('live-stats-container');
+        if (statsEl) {
+            let statsHtml = '';
+            if (c.state.burnt) {
+                statsHtml = '<div class="stat-item"><span class="stat-label">Estado</span><span class="stat-value" style="color:#ef4444">DAÑADO</span></div>';
+            } else {
+                statsHtml += `<div class="stat-item"><span class="stat-label">Corriente</span><span class="stat-value">${(c.state.current * 1000).toFixed(1)} mA</span></div>`;
+                statsHtml += `<div class="stat-item"><span class="stat-label">Potencia</span><span class="stat-value">${(c.state.power).toFixed(3)} W</span></div>`;
+                statsHtml += `<div class="stat-item"><span class="stat-label">V. Caída</span><span class="stat-value">${(c.state.voltageDrop).toFixed(2)} V</span></div>`;
 
-        this.propertiesPanel.innerHTML = html;
+                if (c.type === 'diode') {
+                    statsHtml += `<div class="stat-item"><span class="stat-label">Modo</span><span class="stat-value">${c.state.voltageDrop > 0.5 ? 'ON' : 'OFF'}</span></div>`;
+                }
+            }
+            statsEl.innerHTML = statsHtml;
+        }
+    }
+
+    deselect() {
+        this.selectedComponent = null;
+        this.updatePropertiesPanel();
     }
 
     // ===================================
@@ -846,6 +871,14 @@ class App {
         // Render
         this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
 
+        // Update Grid Background
+        const gridSize = 40 * this.camera.zoom;
+        const offX = -this.camera.x * this.camera.zoom + this.canvas.width / 2;
+        const offY = -this.camera.y * this.camera.zoom + this.canvas.height / 2;
+
+        this.canvas.style.backgroundSize = `${gridSize}px ${gridSize}px`;
+        this.canvas.style.backgroundPosition = `${offX}px ${offY}px`;
+
         this.ctx.save();
         // Camera Transform
         this.ctx.translate(this.canvas.width / 2, this.canvas.height / 2);
@@ -976,13 +1009,14 @@ class App {
             if (!this.frameCount) this.frameCount = 0;
             this.frameCount++;
             if (this.frameCount % 5 === 0) {
-                this.updatePropertiesPanel();
+                this.updatePropertiesPanel(true); // only stats
             }
         }
 
         requestAnimationFrame(() => this.loop());
     }
 }
+
 
 // Global hooks for UI
 window.app = null;

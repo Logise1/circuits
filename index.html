@@ -17,72 +17,74 @@
         <canvas id="circuit-canvas"></canvas>
 
         <div id="ui-layer">
-            <aside class="sidebar glass-panel">
-                <div class="header">
-                    <h2>Componentes</h2>
-                </div>
+            <nav class="toolbar glass">
+                <div class="brand">Circuit</div>
                 <div class="component-list">
                     <div class="component-item" draggable="true" data-type="battery">
-                        <div class="icon battery-icon"></div>
+                        <div class="icon">
+                            <div class="battery-icon"></div>
+                        </div>
                         <span>Batería</span>
                     </div>
                     <div class="component-item" draggable="true" data-type="resistor">
-                        <div class="icon resistor-icon"></div>
+                        <div class="icon">
+                            <div class="resistor-icon"></div>
+                        </div>
                         <span>Resistencia</span>
                     </div>
                     <div class="component-item" draggable="true" data-type="light">
-                        <div class="icon light-icon"></div>
+                        <div class="icon">
+                            <div class="light-icon"></div>
+                        </div>
                         <span>Bombilla</span>
                     </div>
                     <div class="component-item" draggable="true" data-type="switch">
-                        <div class="icon switch-icon"></div>
+                        <div class="icon">
+                            <div class="switch-icon"></div>
+                        </div>
                         <span>Interruptor</span>
                     </div>
                     <div class="component-item" draggable="true" data-type="fan">
-                        <div class="icon fan-icon"></div>
+                        <div class="icon">
+                            <div class="fan-icon"></div>
+                        </div>
                         <span>Ventilador</span>
                     </div>
                     <div class="component-item" draggable="true" data-type="diode">
-                        <div class="icon diode-icon"></div>
+                        <div class="icon">
+                            <div class="diode-icon"></div>
+                        </div>
                         <span>Diodo</span>
                     </div>
                 </div>
 
-                <div class="separator"></div>
-
                 <div class="file-controls">
-                    <h3>Archivo</h3>
-                    <div class="btn-group">
-                        <button class="glass-btn small-btn" id="save-btn">Guardar</button>
-                        <button class="glass-btn small-btn" id="load-trigger-btn">Cargar</button>
-                        <input type="file" id="file-input" style="display: none" accept=".json">
-                    </div>
+                    <button class="glass-btn small-btn" id="save-btn">Guardar</button>
+                    <button class="glass-btn small-btn" id="load-trigger-btn">Cargar</button>
+                    <input type="file" id="file-input" style="display: none" accept=".json">
                 </div>
+            </nav>
 
-                <div class="separator"></div>
-
-                <div class="properties-panel" id="properties-panel">
-                    <h3>Propiedades</h3>
-                    <div id="properties-content">
-                        <p class="placeholder-text">Selecciona un componente</p>
-                    </div>
+            <div class="properties-bubble" id="properties-panel">
+                <div class="properties-header">
+                    <h3 id="prop-title">Propiedades</h3>
+                    <button class="prop-close-btn" onclick="window.app.deselect()">×</button>
                 </div>
-            </aside>
+                <div id="properties-content">
+                    <!-- Dynamic Content -->
+                </div>
+            </div>
 
-            <div class="status-bar glass-panel">
+            <div class="status-bar glass">
                 <div class="status-item">
                     <span class="label">Zoom:</span>
                     <span id="zoom-level">100%</span>
                 </div>
-                <div class="status-item">
-                    <span class="label">Simulación:</span>
-                    <span class="status-indicator active"></span>
-                    <span>Corriendo</span>
+                <!-- Controls like Clear can go here or top right -->
+                <div class="status-item" style="margin-left:auto">
+                    <button id="clear-btn" class="glass-btn small-btn danger"
+                        style="padding:4px 10px; font-size:0.8rem">Limpiar</button>
                 </div>
-            </div>
-
-            <div class="overlay-controls">
-                <button id="clear-btn" class="glass-btn">Limpiar Todo</button>
             </div>
         </div>
     </div>
